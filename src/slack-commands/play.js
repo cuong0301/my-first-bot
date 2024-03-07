@@ -1,3 +1,4 @@
+const { EmbedBuilder } = require("discord.js");
 const {
   joinVoiceChannel,
   createAudioPlayer,
@@ -6,8 +7,6 @@ const {
   entersState,
   VoiceConnectionStatus,
 } = require("@discordjs/voice");
-const { EmbedBuilder } = require("discord.js");
-const { search } = require("play-dl");
 const ytdl = require("ytdl-core");
 
 module.exports = async function play(message, link) {
@@ -16,6 +15,11 @@ module.exports = async function play(message, link) {
     return message.reply(
       "Bạn cần phải ở trong kênh thoại để có thể phát nhạc!"
     );
+  }
+
+  // Kiểm tra xem link có hợp lệ không
+  if (!ytdl.validateURL(link)) {
+    return message.reply("Link YouTube không hợp lệ!");
   }
 
   const connection = joinVoiceChannel({
@@ -28,44 +32,38 @@ module.exports = async function play(message, link) {
     await entersState(connection, VoiceConnectionStatus.Ready, 20e3);
 
     const player = createAudioPlayer();
+    const resource = createAudioResource(
+      ytdl(link, {
+        filter: "audioonly",
+        fmt: "mp3",
+        highWaterMark: 1 << 62,
+        liveBuffer: 1 << 62,
+        dlChunkSize: 0,
+        bitrate: 128,
+        quality: "lowestaudio",
+      }),
+      {
+        inputType: StreamType.Arbitrary,
+      }
+    );
+    player.play(resource);
 
-    // Tìm kiếm video trên YouTube
-    const searchResults = await search(link, { limit: 1 });
+    connection.subscribe(player);
+    const info = await ytdl.getInfo(link);
 
-    if (searchResults[0]) {
-      const video = searchResults[0];
-      const resource = createAudioResource(
-        ytdl(link, {
-          filter: "audioonly",
-          fmt: "mp3",
-          highWaterMark: 1 << 62,
-          liveBuffer: 1 << 62,
-          dlChunkSize: 0,
-          bitrate: 128,
-          quality: "lowestaudio",
-        }),
-        {
-          inputType: StreamType.Arbitrary,
-        }
-      );
-      player.play(resource);
-      connection.subscribe(player);
-      // Tạo một MessageEmbed để hiển thị thông tin video với màu ngẫu nhiên
-      const embed = new EmbedBuilder()
-        .setColor("Random")
-        .setTitle(video.title)
-        .setURL(video.url)
-        .setThumbnail(video.thumbnail)
-        .addFields({
-          name: `Views: ${video.views}`,
-          value: "\u200B", // This is to add an empty field for spacing
-          inline: true,
-        });
-      // Gửi embed vào kênh
-      message.channel.send({ embeds: [embed] });
-    } else {
-      message.reply("Không tìm thấy video phù hợp!");
-    }
+    // Tạo embed để in ra thông tin của bài hát
+    const embed = new EmbedBuilder()
+      .setColor("Random")
+      .setTitle(info.videoDetails.title)
+      .setURL(info.videoDetails.video_url)
+      .setThumbnail(info.videoDetails.thumbnails[0].url)
+      .addFields({
+        name: "Views",
+        value: info.videoDetails.viewCount.toLocaleString(),
+        inline: true,
+      });
+
+    message.channel.send({ embeds: [embed] });
   } catch (error) {
     console.error(error);
     message.reply("Có lỗi xảy ra khi bắt đầu phát nhạc!");
