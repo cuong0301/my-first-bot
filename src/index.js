@@ -21,24 +21,21 @@ client.on("messageCreate", (msg) => {
   }
 });
 
-client.on("messageCreate", async (message) => {
-  if (message.content.startsWith("!play")) {
-    const args = message.content.split(" ");
-    const link = args[1];
-    play(message, link);
+client.on("interactionCreate", (interaction) => {
+  if (!interaction.isChatInputCommand) return;
+
+  if (interaction.commandName === "play") {
+    const link = interaction.options.get("link").value;
+    play(interaction, link);
   }
 
-  if (message.content.startsWith("!stop")) {
-    stop(message);
+  if (interaction.commandName === "stop") {
+    stop(interaction);
   }
 
-  if (message.content.startsWith("!skip")) {
-    skip(message);
+  if (interaction.commandName === "skip") {
+    skip(interaction);
   }
-
-  // if (message.content.startsWith("!skip")) {
-  //   skip(message);
-  // }
 });
 
 client.login(process.env.TOKEN);
