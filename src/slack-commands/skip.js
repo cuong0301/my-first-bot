@@ -1,41 +1,64 @@
-// skip.js
+import { EmbedBuilder } from "discord.js";
+import {
+  joinVoiceChannel,
+  createAudioPlayer,
+  createAudioResource,
+  StreamType,
+} from "@discordjs/voice";
+import ytdl from "ytdl-core";
 
-const queues = {};
-module.exports = function skip(message) {
-  // Kiểm tra xem người gửi tin nhắn có ở trong kênh thoại không
-  if (!message.member.voice.channel) {
-    return message.reply(
-      "Bạn cần phải ở trong kênh thoại để có thể sử dụng lệnh này!"
-    );
-  }
+export async function skip(interaction, track, onTrackEnd) {
+  const connection = joinVoiceChannel({
+    channelId: interaction.member.voice.channel.id,
+    guildId: interaction.guild.id,
+    adapterCreator: interaction.guild.voiceAdapterCreator,
+  });
 
-  // Lấy thông tin về danh sách đang phát
-  const queue = getQueue(message.guild.id);
-  if (!queue || queue.length === 0) {
-    return message.reply("Không có bài hát nào đang phát!");
-  }
+  // Lấy thông tin của bài hát tiếp theo
+  if (track.length > 0) {
+    // Lấy thông tin của bài hát hiện tại
+    const url = track[0];
 
-  function nextTrack(guildId) {
-    function playNextTrack(guildId) {
-      const queue = getQueue(guildId);
-      if (queue.length > 0) {
-        // Lấy bài hát tiếp theo trong danh sách phát
-        const nextTrack = queue[0];
-        // Phát bài hát tiếp theo
-        playTrack(guildId, nextTrack);
-      } else {
-        stopPlaying(guildId);
-        // Không có bài hát nào trong danh sách phát, có thể dừng phát nhạc hoặc gửi thông báo
+    const info = await ytdl.getInfo(url);
+
+    track.shift(); // Xóa bài hát hiện tại khỏi danh sách track
+
+    const nextUrl = track[0];
+    const nextInfo = await ytdl.getInfo(nextUrl);
+
+    // Tạo resource cho bài hát tiếp theo
+    const resource = createAudioResource(
+      await ytdl(nextUrl, {
+        filter: "audioonly",
+        fmt: "mp3",
+        highWaterMark: 1 << 25,
+        quality: "highestaudio",
+      }),
+      {
+        inputType: StreamType.Arbitrary,
       }
-    }
-    const queue = getQueue(guildId);
-    // Xóa bài hiện tại từ danh sách phát
-    queue.shift();
-    // Bắt đầu phát bài tiếp theo nếu có
-    playNextTrack(guildId);
-  }
-  // Nhảy sang bài hát tiếp theo
-  nextTrack(message.guild.id);
+    );
+    // Tạo một Embed để thông báo cho người dùng rằng bài hát đã được skip
+    const skipEmbed = new EmbedBuilder()
+      .setDescription(`Không nghe ${info.videoDetails.title} nữa thì thôi`)
+      .setThumbnail(info.videoDetails.thumbnails[0].url);
 
-  message.channel.send("Bài hiện tại đã được skip!");
-};
+    const nextEmbed = new EmbedBuilder()
+      .setDescription(
+        `Thế thì em sẽ được nghe tiếp ${nextInfo.videoDetails.title} `
+      )
+      .setThumbnail(nextInfo.videoDetails.thumbnails[0].url);
+
+    // Phản hồi với Embed trên
+    await interaction.channel.send({ embeds: [skipEmbed] });
+    await interaction.channel.send({ embeds: [nextEmbed] });
+    // Phát bài hát tiếp theo
+    const player = createAudioPlayer();
+    player.play(resource);
+    connection.subscribe(player);
+  } else {
+    // Nếu không có bài hát nào đang được phát, phản hồi với thông báo tương ứng
+    onTrackEnd();
+    return interaction.channel.send("Không có bài nào tiếp bé ơi 😢");
+  }
+}

@@ -1,21 +1,23 @@
-const { Client, IntentsBitField, EmbedBuilder } = require("discord.js");
-const { joinVoiceChannel, getVoiceConnection } = require("@discordjs/voice");
+import { joinVoiceChannel } from "@discordjs/voice";
 
 // stop.js
-module.exports = async function stop(message) {
-  const voiceChannel = message.member.voice.channel;
-  if (!voiceChannel)
-    return message.reply("Bạn cần phải ở trong kênh thoại để dừng nhạc.");
+export async function stop(interaction, track, onTrackEnd) {
+  if (track) {
+    const voiceChannel = interaction.member.voice.channel;
+    if (!voiceChannel)
+      return interaction.reply("Bạn cần phải ở trong kênh thoại để dừng nhạc.");
 
-  const connection = joinVoiceChannel({
-    channelId: message.member.voice.channel.id,
-    guildId: message.guild.id,
-    adapterCreator: message.guild.voiceAdapterCreator,
-  });
+    const connection = joinVoiceChannel({
+      channelId: interaction.member.voice.channel.id,
+      guildId: interaction.guild.id,
+      adapterCreator: interaction.guild.voiceAdapterCreator,
+    });
 
-  if (!connection)
-    return message.reply("Bot không đang phát nhạc trong kênh này.");
-
-  connection.destroy();
-  message.reply("Đã dừng nhạc.");
-};
+    if (!connection)
+      return interaction.reply("Bot không đang phát nhạc trong kênh này.");
+    connection.destroy();
+    track.length = 0;
+    onTrackEnd();
+    return interaction.reply("Đã dừng nhạc.");
+  }
+}
