@@ -68,7 +68,7 @@ export async function play(interaction, track, onTrackEnd) {
 
     // Tạo embed để in ra thông tin của bài hát
     const embed = new EmbedBuilder()
-      .setColor("Random")
+      .setColor("#FF69B4")
       .setTitle("Tôi cho phép các em nghe....")
       .setDescription(
         `[${info.videoDetails.title}](${info.videoDetails.video_url})`

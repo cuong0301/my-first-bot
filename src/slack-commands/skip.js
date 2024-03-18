@@ -14,6 +14,12 @@ export async function skip(interaction, track, onTrackEnd) {
     adapterCreator: interaction.guild.voiceAdapterCreator,
   });
 
+  // Kiểm tra nếu danh sách phát không còn bài hát nào
+  if (track.length === 1) {
+    onTrackEnd();
+    return interaction.channel.send("Không có bài nào tiếp bé ơi 😢");
+  }
+
   // Lấy thông tin của bài hát tiếp theo
   if (track.length > 0) {
     // Lấy thông tin của bài hát hiện tại
@@ -40,10 +46,12 @@ export async function skip(interaction, track, onTrackEnd) {
     );
     // Tạo một Embed để thông báo cho người dùng rằng bài hát đã được skip
     const skipEmbed = new EmbedBuilder()
+      .setColor("#FF69B4")
       .setDescription(`Không nghe ${info.videoDetails.title} nữa thì thôi`)
       .setThumbnail(info.videoDetails.thumbnails[0].url);
 
     const nextEmbed = new EmbedBuilder()
+      .setColor("#FF69B4")
       .setDescription(
         `Thế thì em sẽ được nghe tiếp ${nextInfo.videoDetails.title} `
       )
