@@ -1,5 +1,10 @@
 import dotenv from "dotenv";
-import { Client, IntentsBitField, EmbedBuilder } from "discord.js";
+import {
+  Client,
+  IntentsBitField,
+  EmbedBuilder,
+  ActivityType,
+} from "discord.js";
 import ytdl from "ytdl-core";
 
 import { play } from "./slack-commands/play.js";
@@ -21,79 +26,96 @@ const client = new Client({
   ],
 });
 
+client.on("ready", (c) => {
+  client.user.setActivity({
+    name: "!help",
+    type: ActivityType.Listening,
+  });
+});
+
 client.on("messageCreate", (msg) => {
   if (msg.author.bot) return;
-  if ((msg.content === "Hello") | (msg.content === "Hi")) {
-    return msg.channel.send("Daddy Cường chào tất cả các em 🌹");
+  const contentLower = msg.content.toLowerCase();
+  if (contentLower === "hello" || contentLower === "hi") {
+    return msg.channel.send(
+      "Daddy Cường chào tất cả các em 🌹, Gõ !help để xem tất cả lệnh nhó 🥰"
+    );
   }
 });
+
 let isPlaying = false;
 client.on("messageCreate", async (interaction) => {
   if (interaction.author.bot) return;
   const args = interaction.content.split(" ");
   const link = args[1];
+  const command = args.shift().toLowerCase();
   if (link) {
     track.push(link);
   }
 
-  if (interaction.content === "!help") {
-    const helpMessage =
-      "Danh sách các lệnh:\n" +
-      "!play [link YouTube]: Phát nhạc từ link YouTube\n" +
-      "!skip: Bỏ qua bài hát đang phát\n" +
-      "!stop: Dừng phát nhạc và xóa danh sách bài hát";
+  switch (command) {
+    case "!play":
+      // Kiểm tra xem người gửi tin nhắn có ở trong kênh thoại không
+      if (!interaction.member.voice.channel) {
+        return interaction.channel.send(
+          "Không ai trong kênh thoại, thì tôi bật ai nghe, bé hư quá 😡"
+        );
+      }
 
-    const embed = new EmbedBuilder()
-      .setTitle("Help")
-      .setDescription(helpMessage)
-      .setColor("#FF69B4");
+      // Kiểm tra xem link có hợp lệ không
+      if (!ytdl.validateURL(link)) {
+        return interaction.channel.send(
+          "Link YouTube không đúng rồi bé, check lại xem nào."
+        );
+      }
 
-    return interaction.channel.send({ embeds: [embed] });
-  }
+      if (!isPlaying) {
+        isPlaying = true;
+        play(interaction, track, () => {
+          isPlaying = false;
+        });
+      } else {
+        const info = await ytdl.getInfo(link);
+        interaction.reply(
+          `Tôi cho phép em thêm ${info.videoDetails.title} vào danh sách`
+        );
+      }
+      break;
 
-  if (interaction.content.startsWith("!play")) {
-    // Kiểm tra xem người gửi tin nhắn có ở trong kênh thoại không
-    if (!interaction.member.voice.channel) {
-      return interaction.channel.send(
-        "Không ai trong kênh thoại, thì tôi bật ai nghe, bé hư quá 😡"
-      );
-    }
-    // Kiểm tra xem link có hợp lệ không
-    if (!ytdl.validateURL(link)) {
-      return interaction.channel.send(
-        "Link YouTube không đúng rồi bé, check lại xem nào."
-      );
-    }
+    case "!playlist":
+      playlist(interaction, track);
+      break;
 
-    if (!isPlaying) {
-      isPlaying = true;
-      play(interaction, track, () => {
+    case "!skip":
+      skip(interaction, track, () => {
         isPlaying = false;
       });
-    } else {
-      const info = await ytdl.getInfo(link);
-      interaction.reply(
-        `Tôi cho phép em thêm ${info.videoDetails.title} vào danh sách`
-      );
-    }
-  }
+      break;
 
-  if (interaction.content.startsWith("!skip")) {
-    skip(interaction, track, () => {
-      isPlaying = false;
-    });
-  }
+    case "!stop":
+      stop(interaction, track, () => {
+        isPlaying = false;
+      });
+      break;
 
-  if (interaction.content.startsWith("!stop")) {
-    stop(interaction, track, () => {
-      isPlaying = false;
-    });
-  }
+    case "!help":
+      const helpMessage =
+        "Danh sách các lệnh:\n" +
+        "!play [link YouTube]: Phát nhạc từ link YouTube\n" +
+        "!skip: Bỏ qua bài hát đang phát\n" +
+        "!stop: Dừng phát nhạc và xóa danh sách bài hát\n" +
+        "!playlist: Xem danh sách nhạc đang có";
 
-  if (interaction.content.startsWith("!playlist")) {
-    playlist(interaction, track, () => {
-      isPlaying = false;
-    });
+      const embed = new EmbedBuilder()
+        .setTitle("Help")
+        .setDescription(helpMessage)
+        .setColor("#FF69B4");
+
+      interaction.channel.send({ embeds: [embed] });
+      break;
+
+    default:
+      break;
   }
 });
 
